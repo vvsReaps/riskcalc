@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Reaps Risk Calculator</title>
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --card-bg: #1a1a1a;
+      --accent: #e94560;
+      --border: #333;
+      --hover-bg: #2a2a2a;
+      --text: #f2f2f2;
+      --muted: #888;
+      --success: #00ffc3;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+    }
+    .container {
+      width: 100%; max-width: 420px;
+      background: var(--bg);
+      border: 2px solid #5c0d11;
+      border-radius: 12px;
+      padding: 1.5rem;
+      box-shadow: 0 0 15px rgba(255,0,0,0.2);
+    }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .header h2 { color: var(--accent); font-size: 1.4rem; }
+    label { display: block; margin-top: 1rem; font-size: 0.9rem; }
+    input, textarea {
+      width: 100%; padding: 0.6rem; margin-top: 0.3rem;
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 5px; color: #fff; font-size: 1rem;
+    }
+    #stopReminder, #smaReminder { margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted); }
+    .btn { background: var(--accent); color: #fff; border: none; border-radius: 5px; cursor: pointer; transition: background 0.2s; }
+    .btn:hover { background: #c6344c; }
+    .btn-full { width: 100%; margin-top: 1rem; padding: 0.8rem 1.2rem; font-size: 1rem; }
+    #resultContainer { margin-top: 1.5rem; }
+    #result { color: var(--success); font-weight: bold; min-height: 1.2em; }
+    #actionButtons { display: none; margin-top: 0.8rem; gap: 0.5rem; }
+    #actionButtons .btn { padding: 0.8rem 1.2rem; flex: 1; }
+    .section { margin-top: 2rem; border-top: 1px solid #444; padding-top: 1rem; }
+    h3 { font-size: 1.1rem; margin-bottom: 0.8rem; }
+    #tradeLog, #watchLog { list-style: none; padding: 0; margin: 0; }
+    #tradeLog li, #watchLog li {
+      display: flex; flex-direction: column;
+      background: var(--card-bg); border: 1px solid var(--border);
+      border-radius: 5px; padding: 0.75rem 1rem; margin-bottom: 0.5rem;
+      transition: background 0.3s;
+    }
+    #watchLog li { flex-direction: row; justify-content: space-between; align-items: center; }
+    .trade-info { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .trade-date { font-size: 0.85rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .trade-reminders div { font-size: 0.9rem; color: var(--muted); margin-top: 0.2rem; }
+    #overlay { display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.6); z-index: 999; }
+    #importPopup {
+      display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: var(--card-bg); border: 2px solid var(--accent); border-radius: 10px;
+      padding: 1rem; width: 90%; max-width: 360px; box-shadow: 0 0 10px rgba(255,0,0,0.4); z-index: 1000;
+    }
+    #importPopup textarea { width: 100%; height: 6rem; margin-bottom: 0.8rem; resize: vertical; background: var(--card-bg); border: 1px solid var(--border); color: #fff; border-radius: 5px; padding: 0.6rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>💀Reaps Risk Calculator📉</h2>
+      <button id="import-btn" class="btn" onclick="toggleImport()">Import Alert</button>
+    </div>
+    <label>Account Value ($):</label><input id="account" type="number" step="0.01">
+    <label>Risk Percentage (%):</label><input id="risk" type="number" step="0.01">
+    <label>Ticker Symbol:</label><input id="ticker" type="text">
+    <label>Entry Price ($):</label><input id="entry" type="number" step="0.01">
+    <label>Stop Loss ($):</label><input id="stop" type="number" step="0.01">
+    <div id="stopReminder">🔔 Reminder: Stop loss goes at the <strong>low of the current day</strong></div>
+    <div id="smaReminder">🔔 Reminder: Sell all shares if it closes under the 10SMA</div>
+    <button class="btn btn-full" onclick="calculateShares()">Calculate</button>
+
+    <div id="resultContainer">
+      <div id="result"></div>
+      <div id="actionButtons">
+        <button class="btn" onclick="logTrade()">Bought</button>
+        <button class="btn" onclick="clearResult()">New Trade</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>📜 Trade History</h3>
+      <ul id="tradeLog"></ul>
+    </div>
+
+    <div class="section">
+      <h3>🔍 Watchlist</h3>
+      <button class="btn btn-full" onclick="toggleWatchlist()">Toggle Watchlist</button>
+      <div id="watchlist" style="display:none;">
+        <div style="display:flex; gap:0.5rem; margin-bottom:0.8rem;">
+          <input id="watchSymbol" type="text" placeholder="Enter ticker to watch">
+          <button class="btn" onclick="addToWatchlist()">Add</button>
+        </div>
+        <ul id="watchLog"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import Popup -->
+  <div id="overlay"></div>
+  <div id="importPopup">
+    <textarea id="alertInput" placeholder="Paste alert here…"></textarea>
+    <button class="btn btn-full" onclick="importAlert()">Import Alert</button>
+  </div>
+
+  <script>
+    let currentTrade = {};
+    function toggleImport() {
+      const pop = document.getElementById('importPopup');
+      const ov  = document.getElementById('overlay');
+      const open = pop.style.display === 'block';
+      pop.style.display = open ? 'none' : 'block';
+      ov.style.display  = open ? 'none' : 'block';
+    }
+    function importAlert() {
+      const txt = document.getElementById('alertInput').value;
+      const m1 = txt.match(/Adding \$(\w+)/i);
+      const m2 = txt.match(/shares @ \$(\d+(\.\d+)?)/i);
+      const m3 = txt.match(/Stop loss @ \$(\d+(\.\d+)?)/i);
+      const m4 = txt.match(/Risking (\d+(\.\d+)?)%/i);
+      if (m1) document.getElementById('ticker').value = m1[1];
+      if (m2) document.getElementById('entry').value  = m2[1];
+      if (m3) document.getElementById('stop').value   = m3[1];
+      if (m4) document.getElementById('risk').value   = m4[1];
+      document.getElementById('alertInput').value = '';
+      toggleImport();
+    }
+    function calculateShares() {
+      const t = document.getElementById('ticker').value.toUpperCase();
+      const a = parseFloat(document.getElementById('account').value);
+      const r = parseFloat(document.getElementById('risk').value);
+      const e = parseFloat(document.getElementById('entry').value);
+      const s = parseFloat(document.getElementById('stop').value);
+      const res = document.getElementById('result');
+      const actions = document.getElementById('actionButtons');
+      if (!t||isNaN(a)||isNaN(r)||isNaN(e)||isNaN(s)) {
+        res.innerText = 'Please fill all fields';
+        actions.style.display = 'none';
+        return;
+      }
+      const riskAmt = (r/100)*a;
+      const perShare = Math.abs(e - s);
+      if (perShare === 0) {
+        res.innerText = 'Stop must differ';
+        actions.style.display = 'none';
+        return;
+      }
+      const shares = Math.floor(riskAmt / perShare);
+      res.innerText = `You can buy ${shares} shares of ${t}. Risking $${riskAmt.toFixed(2)}.`;
+      actions.style.display = 'flex';
+      currentTrade = { ticker: t, shares, riskAmount: riskAmt.toFixed(2), entry: e, stop: s };
+    }
+    function logTrade() {
+      const log = document.getElementById('tradeLog');
+      const li = document.createElement('li');
+      const { ticker, shares, entry, stop } = currentTrade;
+      const rr = entry - stop;
+      const t1 = (entry + rr*3).toFixed(2);
+      const t2 = (entry + rr*5).toFixed(2);
+      const q1 = Math.floor(shares * 0.2);
+      const q2 = Math.floor(shares * 0.3);
+      const date = new Date().toLocaleDateString();
+      li.innerHTML = `
+        <div class="trade-info">
+          <span>${ticker}:</span><span>${shares} shares</span><span>Entry $${entry}</span><span>Stop $${stop}</span>
+        </div>
+        <div class="trade-date">${date}</div>
+        <div class="trade-reminders">
+          <div>🔔 Trim 20%: Sell ${q1} shares at $${t1}</div>
+          <div>🔔 Trim 30%: Sell ${q2} shares at $${t2}</div>
+        </div>
+        <div class="trade-actions">
+          <button class="btn btn-full" onclick="removeTrade(this)">Sold</button>
+        </div>`;
+      log.appendChild(li);
+      clearResult();
+    }
+    function clearResult() {
+      document.getElementById('result').innerText = '';
+      document.getElementById('actionButtons').style.display = 'none';
+      currentTrade = {};
+    }
+    function removeTrade(btn) {
+      btn.closest('li').remove();
+    }
+    function toggleWatchlist() {
+      const w = document.getElementById('watchlist');
+      w.style.display = w.style.display === 'none' ? 'block' : 'none';
+    }
+    function addToWatchlist() {
+      const sym = document.getElementById('watchSymbol').value.trim().toUpperCase();
+      if (!sym) return;
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="symbol">${sym}</span><button class="btn" onclick="removeFromWatchlist(this)">&times;</button>`;
+      document.getElementById('watchLog').appendChild(li);
+      saveWatchlist();
+      document.getElementById('watchSymbol').value = '';
+    }
+    function removeFromWatchlist(btn) {
+      btn.closest('li').remove();
+      saveWatchlist();
+    }
+    function saveWatchlist() {
+      const arr = Array.from(document.querySelectorAll('#watchLog li')).map(li => li.outerHTML);
+      localStorage.setItem('reaps_watchlist', JSON.stringify(arr));
+    }
+    function loadWatchlist() {
+      const arr = JSON.parse(localStorage.getItem('reaps_watchlist') || '[]');
+      const log = document.getElementById('watchLog');
+      arr.forEach(html => {
+        const tmp = document.createElement('div'); tmp.innerHTML = html;
+        log.appendChild(tmp.firstChild);
+      });
+    }
+    window.onload = () => { loadWatchlist(); };
+  </script>
+</body>
+</html>
