@@ -111,7 +111,6 @@
     </div>
   </div>
 
-  <!-- Import Popup -->
   <div id="overlay"></div>
   <div id="importPopup">
     <textarea id="alertInput" placeholder="Paste alert here…"></textarea>
@@ -120,6 +119,36 @@
 
   <script>
     let currentTrade = {};
+    /***** Persistence for Trades *****/
+    function saveTrades() {
+      const arr = Array.from(document.querySelectorAll('#tradeLog li'))
+                     .map(li => li.outerHTML);
+      localStorage.setItem('reaps_tradeHistory', JSON.stringify(arr));
+    }
+    function loadTrades() {
+      const arr = JSON.parse(localStorage.getItem('reaps_tradeHistory') || '[]');
+      const log = document.getElementById('tradeLog');
+      arr.forEach(html => {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        log.appendChild(tmp.firstChild);
+      });
+    }
+    /***** Persistence for Watchlist *****/
+    function saveWatchlist() {
+      const arr = Array.from(document.querySelectorAll('#watchLog li'))
+                     .map(li => li.outerHTML);
+      localStorage.setItem('reaps_watchlist', JSON.stringify(arr));
+    }
+    function loadWatchlist() {
+      const arr = JSON.parse(localStorage.getItem('reaps_watchlist') || '[]');
+      const log = document.getElementById('watchLog');
+      arr.forEach(html => {
+        const tmp = document.createElement('div'); tmp.innerHTML = html;
+        log.appendChild(tmp.firstChild);
+      });
+    }
+
     function toggleImport() {
       const pop = document.getElementById('importPopup');
       const ov  = document.getElementById('overlay');
@@ -188,6 +217,7 @@
           <button class="btn btn-full" onclick="removeTrade(this)">Sold</button>
         </div>`;
       log.appendChild(li);
+      saveTrades();
       clearResult();
     }
     function clearResult() {
@@ -197,6 +227,7 @@
     }
     function removeTrade(btn) {
       btn.closest('li').remove();
+      saveTrades();
     }
     function toggleWatchlist() {
       const w = document.getElementById('watchlist');
@@ -215,19 +246,7 @@
       btn.closest('li').remove();
       saveWatchlist();
     }
-    function saveWatchlist() {
-      const arr = Array.from(document.querySelectorAll('#watchLog li')).map(li => li.outerHTML);
-      localStorage.setItem('reaps_watchlist', JSON.stringify(arr));
-    }
-    function loadWatchlist() {
-      const arr = JSON.parse(localStorage.getItem('reaps_watchlist') || '[]');
-      const log = document.getElementById('watchLog');
-      arr.forEach(html => {
-        const tmp = document.createElement('div'); tmp.innerHTML = html;
-        log.appendChild(tmp.firstChild);
-      });
-    }
-    window.onload = () => { loadWatchlist(); };
+    window.onload = () => { loadTrades(); loadWatchlist(); };
   </script>
 </body>
 </html>
